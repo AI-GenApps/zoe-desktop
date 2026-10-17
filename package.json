@@ -56,5 +56,5 @@
     "type": "git",
     "url": "https://github.com/AI-GenApps/zoe-desktop.git"
   },
-  "packageManager": "pnpm@9.12.2"
+  "packageManager": "pnpm@12.14.0"
 }
