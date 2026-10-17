@@ -1,0 +1,253 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - v[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing vYYYY-MM-DD tag to release"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+      version: ${{ steps.validate.outputs.version }}
+      commit: ${{ steps.validate.outputs.commit }}
+    steps:
+      - name: Checkout workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Validate tag and main ancestry
+        id: validate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_REF: ${{ github.ref }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "Manual desktop releases must be launched from main" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" != "tag" ]]; then
+            echo "The release workflow only accepts tag pushes" >&2
+            exit 1
+          fi
+
+          TAG="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          VERSION="$(node scripts/release/version.mjs "$TAG")"
+
+          git fetch --force origin main "refs/tags/${TAG}:refs/tags/${TAG}"
+          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          MAIN_COMMIT="$(git rev-parse origin/main)"
+
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_COMMIT"; then
+            echo "Tag ${TAG} (${TAG_COMMIT}) is not reachable from origin/main (${MAIN_COMMIT})" >&2
+            exit 1
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "commit=$TAG_COMMIT"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Building ${TAG} as Tauri version ${VERSION} from ${TAG_COMMIT}"
+
+  build:
+    name: Build and sign ${{ matrix.platform }} installer
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-latest
+          - platform: windows
+            runner: windows-latest
+    env:
+      VITE_APP_VERSION: ${{ needs.validate.outputs.version }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/zybernetix-apple.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/zybernetix-build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+
+          printf '%s' "$APPLE_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(Developer ID Application[^\"]*\)".*/\1/p' | head -n 1)"
+          if [[ -z "$IDENTITY" ]]; then
+            echo "No Developer ID Application identity was found in the imported keychain" >&2
+            exit 1
+          fi
+
+          echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Decode Windows signing certificate
+        if: runner.os == 'Windows'
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "zybernetix-signing.pfx"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          if (-not (Test-Path -LiteralPath $certificatePath)) {
+            throw "Windows signing certificate could not be decoded"
+          }
+
+      - name: Write release Tauri version overlay
+        if: runner.os == 'macOS'
+        run: node scripts/release/write-tauri-overlay.mjs --version "$VITE_APP_VERSION" --output "$RUNNER_TEMP/tauri-release-overlay.json" --create-updater-artifacts --macos-signing-identity "$APPLE_SIGNING_IDENTITY"
+
+      - name: Write release Tauri version and signing overlay
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: node scripts/release/write-tauri-overlay.mjs --version "$env:VITE_APP_VERSION" --output "$env:RUNNER_TEMP/tauri-release-overlay.json" --create-updater-artifacts --windows-sign-script "$env:GITHUB_WORKSPACE\scripts\release\sign-windows.ps1"
+
+      - name: Build and sign desktop installer (macOS)
+        if: runner.os == 'macOS'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: pnpm tauri:build --config "$RUNNER_TEMP/tauri-release-overlay.json"
+
+      - name: Build and sign desktop installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: pnpm tauri:build --config "$env:RUNNER_TEMP/tauri-release-overlay.json"
+
+      - name: Upload platform build for publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-${{ matrix.platform }}-${{ needs.validate.outputs.version }}-${{ github.run_id }}
+          path: src-tauri/target/release/bundle/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            security delete-keychain "$RUNNER_TEMP/zybernetix-build.keychain-db" || true
+          fi
+          rm -f "$RUNNER_TEMP/zybernetix-apple.p12" "$RUNNER_TEMP/zybernetix-signing.pfx"
+
+  publish:
+    name: Publish GitHub Release
+    needs: [validate, build]
+    if: ${{ needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download platform builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-release-*-${{ github.run_id }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release assets
+        run: |
+          set -euo pipefail
+          find release-assets -type f -print
+          test -n "$(find release-assets -type f -name '*.dmg' -print -quit)"
+          test -n "$(find release-assets -type f -name '*.exe' -print -quit)"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Zoe Desktop $RELEASE_TAG" \
+              --notes "Automated signed desktop release for Tauri version $RELEASE_VERSION."
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Zoe Desktop $RELEASE_TAG" \
+              --notes "Automated signed desktop release for Tauri version $RELEASE_VERSION."
+          fi
+
+          mapfile -d '' assets < <(find release-assets -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.sig' \) -print0)
+          if [[ "${#assets[@]}" -eq 0 ]]; then
+            echo "No desktop release assets were found" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
