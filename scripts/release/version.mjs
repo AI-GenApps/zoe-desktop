@@ -46,7 +46,7 @@ export function releaseVersion(tag) {
 function main() {
   const [, , tag] = process.argv;
   if (!tag || process.argv.length !== 3) {
-    throw new Error("Usage: node scripts/desktop-release/version.mjs vYYYY-MM-DD");
+    throw new Error("Usage: node scripts/release/version.mjs vYYYY-MM-DD");
   }
 
   process.stdout.write(`${releaseVersion(tag)}\n`);

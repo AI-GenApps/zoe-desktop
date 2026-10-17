@@ -24,7 +24,7 @@ function parseArguments(argv) {
 
   if (!options.version || !options.output) {
     throw new Error(
-      "Usage: node scripts/desktop-release/write-tauri-overlay.mjs --version VERSION --output FILE [--create-updater-artifacts] [--windows-sign-script FILE]"
+      "Usage: node scripts/release/write-tauri-overlay.mjs --version VERSION --output FILE [--create-updater-artifacts] [--windows-sign-script FILE]"
     );
   }
 

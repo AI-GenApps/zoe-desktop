@@ -1,0 +1,193 @@
+name: Nightly
+
+# Unsigned macOS, Windows and Linux installers published to the rolling "nightly" pre-release.
+# Scheduled runs build only when main has moved since the last nightly; manual runs always build.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  NIGHTLY_TAG: nightly
+
+jobs:
+  changes:
+    name: Check for new commits
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      sha: ${{ steps.check.outputs.sha }}
+      tauri_version: ${{ steps.check.outputs.tauri_version }}
+      app_version: ${{ steps.check.outputs.app_version }}
+    steps:
+      - name: Compare main with the last nightly
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          LAST="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$NIGHTLY_TAG" --jq .object.sha 2>/dev/null || true)"
+
+          if [[ "$EVENT_NAME" == "schedule" && "$SHA" == "$LAST" ]]; then
+            echo "main is still at ${SHA}, the last nightly; nothing to build"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DATE="$(date -u +%Y%m%d)"
+          {
+            echo "should_build=true"
+            echo "sha=$SHA"
+            # Numeric so every bundler accepts it, and below any vYYYY-MM-DD release version (YYYY.M.D).
+            echo "tauri_version=0.${DATE}.${GITHUB_RUN_NUMBER}"
+            echo "app_version=nightly-${DATE}-${SHA:0:7}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building nightly from ${SHA} (last nightly: ${LAST:-none})"
+
+  build:
+    name: Build ${{ matrix.platform }} installer
+    needs: changes
+    if: ${{ needs.changes.outputs.should_build == 'true' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-latest
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            build_args: --target universal-apple-darwin
+            bundle_dir: src-tauri/target/universal-apple-darwin/release/bundle
+          - platform: windows
+            runner: windows-latest
+            rust_targets: ""
+            build_args: ""
+            bundle_dir: src-tauri/target/release/bundle
+          - platform: linux
+            runner: ubuntu-22.04
+            rust_targets: ""
+            build_args: --bundles deb,rpm,appimage
+            bundle_dir: src-tauri/target/release/bundle
+    env:
+      VITE_APP_VERSION: ${{ needs.changes.outputs.app_version }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: nightly-${{ matrix.platform }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write nightly Tauri overlay
+        shell: bash
+        run: |
+          # Ad-hoc signing ("-") keeps the unsigned macOS app launchable on Apple silicon.
+          node scripts/release/write-tauri-overlay.mjs --version "${{ needs.changes.outputs.tauri_version }}" \
+            --macos-signing-identity - --output "$RUNNER_TEMP/tauri-nightly-overlay.json"
+
+      - name: Build unsigned installer
+        shell: bash
+        run: pnpm tauri:build --config "$RUNNER_TEMP/tauri-nightly-overlay.json" ${{ matrix.build_args }}
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          find "${{ matrix.bundle_dir }}" -maxdepth 2 -type f \
+            \( -name '*.dmg' -o -name '*.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) \
+            -exec cp {} out/ \;
+          ls -l out
+          test -n "$(ls -A out)"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.platform }}-${{ github.run_id }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish nightly pre-release
+    needs: [changes, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nightly-*-${{ github.run_id }}
+          path: assets
+          merge-multiple: true
+
+      - name: Replace the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.changes.outputs.sha }}
+          APP_VERSION: ${{ needs.changes.outputs.app_version }}
+        run: |
+          set -euo pipefail
+          ls -l assets
+          gh release delete "$NIGHTLY_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
+
+          cat > notes.md <<EOF
+          Unsigned development build \`${APP_VERSION}\` from ${SHA}.
+
+          - **macOS** (universal \`.dmg\`): the app is not notarized. After copying it to Applications, run
+            \`xattr -dr com.apple.quarantine /Applications/Zybernetix.app\` or right-click it and choose Open.
+          - **Windows** (\`.exe\`): SmartScreen warns about an unknown publisher; choose More info, then Run anyway.
+          - **Linux**: \`.deb\`, \`.rpm\` or \`.AppImage\`.
+
+          Nightlies do not auto-update. Use a dated release for production.
+          EOF
+
+          gh release create "$NIGHTLY_TAG" assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --prerelease \
+            --title "Nightly ${APP_VERSION}" \
+            --notes-file notes.md

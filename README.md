@@ -38,6 +38,11 @@ Pushing a `vYYYY-MM-DD` tag on `main` runs `.github/workflows/release.yml`: it b
 and Windows installers and publishes them to a GitHub Release. The required secrets are listed in
 `scripts/release/setup-signing-checklist.md`. Pull requests get unsigned installers as workflow artifacts.
 
+Nightly builds: `.github/workflows/nightly.yml` runs daily at 02:00 UTC and, when `main` has new commits since the last
+nightly, publishes unsigned macOS (universal), Windows and Linux (`.deb`, `.rpm`, `.AppImage`) installers to the
+rolling [`nightly` pre-release](https://github.com/AI-GenApps/zoe-desktop/releases/tag/nightly). Run it from the
+Actions tab (Nightly → Run workflow) to build one on demand.
+
 ## License
 
 [GNU AGPL-3.0](LICENSE)
