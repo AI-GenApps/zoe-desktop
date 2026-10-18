@@ -27,7 +27,8 @@ export function EmailScreen({ state, error, onSend }: Props) {
 
   return (
     <main style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
-      <h1>Sign in to Zybernetix</h1>
+      <img src="/brand/zoe-agent.svg" alt="" width={48} height={48} style={{ marginBottom: 16 }} />
+      <h1>Sign in to Zoe Agent</h1>
       <form onSubmit={handleSubmit}>
         <label htmlFor="email">Email address</label>
         <br />

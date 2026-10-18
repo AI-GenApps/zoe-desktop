@@ -1,7 +1,7 @@
 [package]
 name = "zybernetix-desktop"
 version = "0.1.0"
-description = "Zoe desktop app"
+description = "Zoe Agent desktop companion"
 authors = ["W3Dev"]
 license = "AGPL-3.0-only"
 repository = "https://github.com/AI-GenApps/zoe-desktop"

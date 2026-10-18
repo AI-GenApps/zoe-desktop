@@ -1,4 +1,4 @@
-name: Nightly
+name: Zoe Agent Nightly
 
 # Unsigned macOS, Windows and Linux installers published to the rolling "nightly" pre-release.
 # Scheduled runs build only when main has moved since the last nightly; manual runs always build.
@@ -55,7 +55,7 @@ jobs:
           echo "Building nightly from ${SHA} (last nightly: ${LAST:-none})"
 
   build:
-    name: Build ${{ matrix.platform }} installer
+    name: Build Zoe Agent ${{ matrix.platform }} installer
     needs: changes
     if: ${{ needs.changes.outputs.should_build == 'true' }}
     runs-on: ${{ matrix.runner }}
@@ -176,7 +176,7 @@ jobs:
           Unsigned development build \`${APP_VERSION}\` from ${SHA}.
 
           - **macOS** (universal \`.dmg\`): the app is not notarized. After copying it to Applications, run
-            \`xattr -dr com.apple.quarantine /Applications/Zybernetix.app\` or right-click it and choose Open.
+            \`xattr -dr com.apple.quarantine "/Applications/Zoe Agent.app"\` or right-click it and choose Open.
           - **Windows** (\`.exe\`): SmartScreen warns about an unknown publisher; choose More info, then Run anyway.
           - **Linux**: \`.deb\`, \`.rpm\` or \`.AppImage\`.
 
@@ -187,5 +187,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$SHA" \
             --prerelease \
-            --title "Nightly ${APP_VERSION}" \
+            --title "Zoe Agent Nightly ${APP_VERSION}" \
             --notes-file notes.md

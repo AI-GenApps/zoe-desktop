@@ -1,4 +1,4 @@
-name: CI
+name: Zoe Agent CI
 
 on:
   push:
@@ -49,7 +49,7 @@ jobs:
         run: pnpm build
 
   installers:
-    name: Build unsigned ${{ matrix.platform }} installer
+    name: Build unsigned Zoe Agent ${{ matrix.platform }} installer
     needs: check
     if: ${{ github.event_name != 'push' }}
     runs-on: ${{ matrix.runner }}

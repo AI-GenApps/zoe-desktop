@@ -1,14 +1,14 @@
-# Zoe Desktop
+# Zoe Agent
 
-The desktop companion for Zoe, the team assistant. It tracks your status (active, idle, on break), lets you plan and
-pick your weekly tasks, and shows today's task report. Built with [Tauri 2](https://tauri.app), React and Vite.
+Zoe Agent is the desktop companion for Zoe, the team assistant. It tracks your status (active, idle, on break), lets you
+plan and pick your weekly tasks, and shows today's task report. Built with [Tauri 2](https://tauri.app), React and Vite.
 
 The app talks to a Zoe server (`/api/member/*`) and signs in with a bearer session kept in the OS keychain
 (Tauri Stronghold).
 
 ## Development
 
-Requirements: Node.js (see `.nvmrc`), pnpm 9, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
+Requirements: Node.js (see `.nvmrc`), pnpm 12, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 for your platform (Rust toolchain plus the system WebView libraries).
 
 ```bash
@@ -41,7 +41,7 @@ and Windows installers and publishes them to a GitHub Release. The required secr
 Nightly builds: `.github/workflows/nightly.yml` runs daily at 02:00 UTC and, when `main` has new commits since the last
 nightly, publishes unsigned macOS (universal), Windows and Linux (`.deb`, `.rpm`, `.AppImage`) installers to the
 rolling [`nightly` pre-release](https://github.com/AI-GenApps/zoe-desktop/releases/tag/nightly). Run it from the
-Actions tab (Nightly → Run workflow) to build one on demand.
+Actions tab (Zoe Agent Nightly → Run workflow) to build one on demand.
 
 ## License
 

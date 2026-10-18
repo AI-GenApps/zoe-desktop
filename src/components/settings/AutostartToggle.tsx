@@ -8,7 +8,7 @@ export function AutostartToggle() {
     <div className="flex items-center justify-between py-3">
       <div className="space-y-0.5">
         <p className="text-sm font-medium">Launch at login</p>
-        <p className="text-xs text-muted-foreground">Automatically start Zybernetix when you log in</p>
+        <p className="text-xs text-muted-foreground">Automatically start Zoe Agent when you log in</p>
       </div>
       {loading ? (
         <div className="h-5 w-9 animate-pulse rounded-full bg-muted" />

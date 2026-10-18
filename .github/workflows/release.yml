@@ -1,4 +1,4 @@
-name: Desktop Release
+name: Zoe Agent Release
 
 on:
   push:
@@ -73,7 +73,7 @@ jobs:
           echo "Building ${TAG} as Tauri version ${VERSION} from ${TAG_COMMIT}"
 
   build:
-    name: Build and sign ${{ matrix.platform }} installer
+    name: Build and sign Zoe Agent ${{ matrix.platform }} installer
     needs: validate
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -234,13 +234,13 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Zoe Desktop $RELEASE_TAG" \
-              --notes "Automated signed desktop release for Tauri version $RELEASE_VERSION."
+              --title "Zoe Agent $RELEASE_TAG" \
+              --notes "Automated signed Zoe Agent release for Tauri version $RELEASE_VERSION."
           else
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Zoe Desktop $RELEASE_TAG" \
-              --notes "Automated signed desktop release for Tauri version $RELEASE_VERSION."
+              --title "Zoe Agent $RELEASE_TAG" \
+              --notes "Automated signed Zoe Agent release for Tauri version $RELEASE_VERSION."
           fi
 
           mapfile -d '' assets < <(find release-assets -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.sig' \) -print0)

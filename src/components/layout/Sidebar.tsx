@@ -47,8 +47,23 @@ export function Sidebar({ collapsed, theme, onCollapse, onToggleTheme }: Sidebar
   return (
     <aside className={cn("flex flex-col border-r bg-card transition-all duration-200", collapsed ? "w-14" : "w-60")}>
       <div className="flex h-12 items-center justify-between px-2">
-        {!collapsed && <span className="truncate text-sm font-semibold text-foreground px-1">Zybernetix</span>}
-        <Button variant="ghost" size="icon" onClick={onCollapse} className="shrink-0 ml-auto">
+        <div className="flex min-w-0 items-center gap-2">
+          <img
+            src="/brand/zoe-agent.svg"
+            alt={collapsed ? "Zoe Agent" : ""}
+            width={28}
+            height={28}
+            className={cn("shrink-0", collapsed ? "h-4 w-4" : "h-7 w-7")}
+          />
+          {!collapsed && <span className="truncate text-sm font-semibold text-foreground">Zoe Agent</span>}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onCollapse}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={cn("shrink-0 ml-auto", collapsed && "h-6 w-6")}
+        >
           {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
         </Button>
       </div>
