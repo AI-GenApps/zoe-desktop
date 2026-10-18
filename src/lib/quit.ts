@@ -1,8 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { APP_VERSION } from "@/lib/app-version";
 import { loadSessionToken } from "@/lib/secure-storage";
-
-const API_BASE = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+import { API_BASE_URL } from "@/lib/api-config";
 
 export async function handleQuit(): Promise<void> {
   const deviceId = localStorage.getItem("znx.device_id") ?? "";
@@ -22,7 +21,7 @@ export async function handleQuit(): Promise<void> {
   try {
     const token = await loadSessionToken();
     await invoke("send_quit_heartbeat", {
-      endpoint: `${API_BASE()}/api/member/heartbeat`,
+      endpoint: `${API_BASE_URL}/api/member/heartbeat`,
       payloadJson: payload,
       authorizationHeader: token ? `Bearer ${token}` : ""
     });

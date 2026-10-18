@@ -1,6 +1,5 @@
 import { loadSessionToken } from "@/lib/secure-storage";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
+import { API_BASE_URL } from "@/lib/api-config";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -20,7 +19,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
     credentials: "include"

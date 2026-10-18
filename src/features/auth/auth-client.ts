@@ -1,6 +1,5 @@
 import { loadSessionToken } from "@/lib/secure-storage";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
+import { API_BASE_URL } from "@/lib/api-config";
 
 export class OtpSendError extends Error {
   constructor(message: string) {
@@ -33,7 +32,7 @@ export class NetworkError extends Error {
 export async function sendVerificationOTP(email: string): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/auth/email-otp/send-verification-otp`, {
+    res = await fetch(`${API_BASE_URL}/api/auth/email-otp/send-verification-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -42,9 +41,17 @@ export async function sendVerificationOTP(email: string): Promise<void> {
   } catch {
     throw new NetworkError();
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new OtpSendError(body?.message ?? `Send failed: ${res.status}`);
+  const body: unknown = await res.json().catch(() => null);
+  const acknowledgement = body !== null && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  if (!res.ok || acknowledgement?.success !== true) {
+    const error = acknowledgement?.error;
+    const nestedMessage = error !== null && typeof error === "object" && "message" in error ? error.message : undefined;
+    const message = [acknowledgement?.message, error, nestedMessage].find(
+      (value): value is string => typeof value === "string" && value.trim().length > 0
+    );
+    throw new OtpSendError(
+      message ?? (res.ok ? "We couldn’t confirm your code was sent. Please try again." : `Send failed: ${res.status}`)
+    );
   }
 }
 
@@ -56,7 +63,7 @@ export interface VerifyResult {
 export async function verifyEmailOTP(email: string, otp: string): Promise<VerifyResult> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/auth/sign-in/email-otp`, {
+    res = await fetch(`${API_BASE_URL}/api/auth/sign-in/email-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -84,7 +91,7 @@ export async function validateSession(): Promise<boolean> {
   try {
     const token = await loadSessionToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    const res = await fetch(`${API_BASE}/api/auth/session`, { credentials: "include", headers });
+    const res = await fetch(`${API_BASE_URL}/api/auth/session`, { credentials: "include", headers });
     return res.ok;
   } catch {
     return false;
@@ -94,7 +101,7 @@ export async function validateSession(): Promise<boolean> {
 export async function registerDevice(token: string, deviceName: string): Promise<string | null> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/member/devices/register`, {
+    res = await fetch(`${API_BASE_URL}/api/member/devices/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
