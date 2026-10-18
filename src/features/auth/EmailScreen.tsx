@@ -1,57 +1,77 @@
 import { useState } from "react";
+import { ArrowRight, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 import type { OtpLoginState } from "./useOtpLogin";
 
 interface Props {
   state: OtpLoginState;
   error: string | null;
   onSend: (email: string) => void;
+  initialEmail?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function EmailScreen({ state, error, onSend }: Props) {
-  const [email, setEmail] = useState("");
+export function EmailScreen({ state, error, onSend, initialEmail = "" }: Props) {
+  const [email, setEmail] = useState(initialEmail);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const isBusy = state === "sending";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!EMAIL_RE.test(email)) {
+    if (isBusy) return;
+    const normalizedEmail = email.trim();
+    if (!EMAIL_RE.test(normalizedEmail)) {
       setValidationError("Please enter a valid email address.");
       return;
     }
     setValidationError(null);
-    onSend(email);
+    onSend(normalizedEmail);
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
-      <img src="/brand/zoe-agent.svg" alt="" width={48} height={48} style={{ marginBottom: 16 }} />
-      <h1>Sign in to Zoe Agent</h1>
-      <form onSubmit={handleSubmit}>
+    <>
+      <div className="auth-step-icon" aria-hidden="true">
+        <Mail size={20} />
+      </div>
+      <h2>Welcome to your workday.</h2>
+      <p className="auth-description">Sign in with your workspace email. We’ll send you a code to get started.</p>
+      <form onSubmit={handleSubmit} className="auth-form" aria-busy={isBusy}>
         <label htmlFor="email">Email address</label>
-        <br />
-        <input
-          id="email"
-          type="email"
-          autoFocus
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.currentTarget.value)}
-          disabled={isBusy}
-          placeholder="you@example.com"
-          style={{ width: "100%", marginTop: 4, marginBottom: 12, padding: "8px 10px" }}
-        />
+        <div className="auth-input-wrap">
+          <Mail className="auth-input-icon" size={16} aria-hidden="true" />
+          <input
+            id="email"
+            type="email"
+            autoFocus
+            autoComplete="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.currentTarget.value);
+              setValidationError(null);
+            }}
+            disabled={isBusy}
+            placeholder="you@example.com"
+            className="auth-input auth-input-email"
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={(validationError ?? error) ? "email-error" : undefined}
+            required
+          />
+        </div>
         {(validationError ?? error) && (
-          <p role="alert" style={{ color: "red", marginBottom: 12 }}>
+          <p id="email-error" role="alert" className="auth-error">
             {validationError ?? error}
           </p>
         )}
-        <button type="submit" disabled={isBusy} style={{ width: "100%", padding: "10px 0" }}>
-          {isBusy ? "Sending…" : "Send code"}
+        <button type="submit" disabled={isBusy} className="auth-submit">
+          {isBusy && <LoaderCircle size={16} className="auth-spinner" aria-hidden="true" />}
+          {isBusy ? "Sending your code…" : "Continue with email"}
+          {!isBusy && <ArrowRight size={16} aria-hidden="true" />}
         </button>
       </form>
-    </main>
+      <p className="auth-form-note">
+        <LockKeyhole size={13} aria-hidden="true" />A one-time code. No password to remember.
+      </p>
+    </>
   );
 }

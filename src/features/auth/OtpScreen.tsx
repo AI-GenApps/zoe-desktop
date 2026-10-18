@@ -1,23 +1,22 @@
 import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, ArrowRight, Inbox, LoaderCircle } from "lucide-react";
 import type { OtpLoginState } from "./useOtpLogin";
 
 interface Props {
   state: OtpLoginState;
   error: string | null;
+  email: string;
+  isSigningIn: boolean;
   onVerify: (otp: string) => void;
   onResend: () => void;
+  onChangeEmail: () => void;
 }
 
-const STATE_MESSAGES: Partial<Record<OtpLoginState, string>> = {
-  expired: "Code expired — resend?",
-  invalid: "Incorrect code. Try again.",
-  "network-error": "Connection error — check your internet."
-};
-
-export function OtpScreen({ state, error, onVerify, onResend }: Props) {
+export function OtpScreen({ state, error, email, isSigningIn, onVerify, onResend, onChangeEmail }: Props) {
   const [otp, setOtp] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const isBusy = state === "verifying";
+  const isBusy = state === "verifying" || state === "sending" || isSigningIn;
+  const hasInvalidCode = state === "invalid" || state === "expired";
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -25,55 +24,67 @@ export function OtpScreen({ state, error, onVerify, onResend }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (otp.length === 6) onVerify(otp);
+    if (!isBusy && otp.length === 6) onVerify(otp);
   }
 
-  const displayMessage = STATE_MESSAGES[state] ?? error;
-
   return (
-    <main style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
-      <h1>Check your email for a 6-digit code</h1>
-      <p style={{ color: "#555" }}>Enter the code we sent to your email address.</p>
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="otp">6-digit code</label>
-        <br />
+    <>
+      <div className="auth-step-icon" aria-hidden="true">
+        <Inbox size={20} />
+      </div>
+      <h2>Check your inbox.</h2>
+      <p className="auth-description">
+        Enter the six-digit code we sent to <strong>{email}</strong>.
+      </p>
+      <form onSubmit={handleSubmit} className="auth-form" aria-busy={isBusy}>
+        <label htmlFor="otp">Sign-in code</label>
         <input
           id="otp"
           ref={inputRef}
           type="text"
           inputMode="numeric"
-          pattern="[0-9]*"
+          autoComplete="one-time-code"
+          pattern="[0-9]{6}"
           maxLength={6}
           value={otp}
           onChange={(e) => setOtp(e.currentTarget.value.replace(/\D/g, ""))}
           disabled={isBusy}
           placeholder="000000"
-          style={{ width: "100%", marginTop: 4, marginBottom: 12, padding: "8px 10px", letterSpacing: "0.3em" }}
+          className="auth-input auth-input-code"
+          aria-invalid={hasInvalidCode}
+          aria-describedby={error ? "otp-error" : undefined}
+          required
         />
-        {displayMessage && (
-          <p role="alert" style={{ color: state === "network-error" ? "orange" : "red", marginBottom: 12 }}>
-            {displayMessage}
+        {error && (
+          <p id="otp-error" role="alert" className="auth-error">
+            {error}
           </p>
         )}
-        <button type="submit" disabled={isBusy || otp.length !== 6} style={{ width: "100%", padding: "10px 0" }}>
-          {isBusy ? "Verifying…" : "Verify"}
+        <button type="submit" disabled={isBusy || otp.length !== 6} className="auth-submit">
+          {isBusy && <LoaderCircle size={16} className="auth-spinner" aria-hidden="true" />}
+          {isSigningIn ? "Signing you in…" : state === "verifying" ? "Verifying…" : "Sign in to Zoe Agent"}
+          {!isBusy && <ArrowRight size={16} aria-hidden="true" />}
         </button>
       </form>
-      <p style={{ marginTop: 16, textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={onResend}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#0070f3",
-            cursor: "pointer",
-            textDecoration: "underline"
-          }}
-        >
-          Resend code
+      <div className="auth-code-actions">
+        <p>
+          Didn’t get it?{" "}
+          <button
+            type="button"
+            disabled={isBusy}
+            className="auth-text-button"
+            onClick={() => {
+              setOtp("");
+              onResend();
+            }}
+          >
+            {state === "sending" ? "Sending…" : "Resend code"}
+          </button>
+        </p>
+        <button type="button" disabled={isBusy} className="auth-text-button auth-back-button" onClick={onChangeEmail}>
+          <ArrowLeft size={13} aria-hidden="true" /> Use a different email
         </button>
-      </p>
-    </main>
+      </div>
+    </>
   );
 }

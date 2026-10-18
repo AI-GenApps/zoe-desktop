@@ -21,7 +21,7 @@ export interface UseOtpLoginResult {
   state: OtpLoginState;
   email: string;
   error: string | null;
-  sendOtp: (email: string) => Promise<void>;
+  sendOtp: (email: string) => Promise<boolean>;
   verifyOtp: (otp: string) => Promise<VerifyResult | null>;
   reset: () => void;
 }
@@ -39,6 +39,7 @@ export function useOtpLogin(client: AuthClient): UseOtpLoginResult {
       try {
         await client.sendVerificationOTP(emailInput);
         setState("sent");
+        return true;
       } catch (err) {
         if (err instanceof NetworkError) {
           setState("network-error");
@@ -47,6 +48,7 @@ export function useOtpLogin(client: AuthClient): UseOtpLoginResult {
           setState("network-error");
           setError(err instanceof Error ? err.message : "Connection error — check your internet.");
         }
+        return false;
       }
     },
     [client]

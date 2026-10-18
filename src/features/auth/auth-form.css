@@ -1,0 +1,187 @@
+.auth-page .auth-card {
+  min-width: 0;
+  padding: 32px;
+  border: 1px solid var(--auth-border);
+  border-radius: 18px;
+  background: var(--auth-card);
+  box-shadow: 0 12px 45px rgb(16 20 40 / 4%);
+}
+.auth-page .auth-card h2 {
+  margin: 19px 0 8px;
+  font-family: "Zoe Syne", sans-serif;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.auth-page .auth-step-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--auth-border);
+  border-radius: 12px;
+  background: var(--auth-soft);
+  color: var(--auth-accent);
+}
+.auth-page .auth-description {
+  margin: 0;
+  color: var(--auth-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.auth-page .auth-description strong {
+  color: var(--auth-text);
+  font-weight: 600;
+}
+.auth-page .auth-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 25px;
+}
+.auth-page .auth-form label {
+  color: var(--auth-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.auth-page .auth-input-wrap {
+  position: relative;
+}
+.auth-page .auth-input-icon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: var(--auth-muted);
+  pointer-events: none;
+}
+.auth-page .auth-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--auth-input-border);
+  border-radius: 9px;
+  background: var(--auth-input);
+  color: var(--auth-text);
+  font-size: 14px;
+  transition: border-color 120ms;
+}
+.auth-page .auth-input::placeholder {
+  color: var(--auth-muted);
+  opacity: 0.85;
+}
+.auth-page .auth-input:hover:not(:disabled) {
+  border-color: var(--auth-muted);
+}
+.auth-page .auth-input:focus {
+  border-color: var(--auth-accent);
+}
+.auth-page .auth-input[aria-invalid="true"] {
+  border-color: var(--auth-error-border);
+}
+.auth-page .auth-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.auth-page .auth-input-email {
+  padding-left: 42px;
+}
+.auth-page .auth-input-code {
+  height: 56px;
+  padding-inline: 12px;
+  text-align: center;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.35em;
+}
+.auth-page .auth-submit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 5px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--auth-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background-color 120ms;
+}
+.auth-page .auth-submit:hover:not(:disabled) {
+  background: var(--auth-primary-hover);
+}
+.auth-page .auth-submit:disabled {
+  opacity: 0.62;
+}
+.auth-page .auth-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--auth-error-border);
+  border-radius: 8px;
+  background: var(--auth-error-bg);
+  color: var(--auth-error-text);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.auth-page .auth-form-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 19px 0 0;
+  color: var(--auth-muted);
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
+.auth-page .auth-code-actions {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  color: var(--auth-muted);
+  font-size: 12px;
+}
+.auth-page .auth-code-actions p {
+  margin: 0;
+}
+.auth-page .auth-text-button {
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--auth-accent);
+  font-size: 12px;
+  font-weight: 500;
+  text-underline-offset: 3px;
+}
+.auth-page .auth-text-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.auth-page .auth-text-button:disabled,
+.auth-page .auth-back-button:disabled {
+  opacity: 0.5;
+}
+.auth-page .auth-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--auth-muted);
+  font-size: 12px;
+}
+.auth-page .auth-back-button:hover:not(:disabled) {
+  color: var(--auth-accent);
+}
+.auth-page .auth-spinner {
+  animation: auth-spin 900ms linear infinite;
+}
